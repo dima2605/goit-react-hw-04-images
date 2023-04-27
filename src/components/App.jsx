@@ -2,99 +2,73 @@ import React from 'react';
 import Button from './Button/Button';
 import ImageGallery from './ImageGallery/ImageGallery';
 
-import { SearchBar } from './Searchbar/Searchbar';
+import SearchBar from './Searchbar/Searchbar';
 import fetchImages from 'services/api';
 import Loader from './Loader/Loader';
 import Modal from './Modal/Modal';
+import { useState, useEffect } from 'react';
 
-export class App extends React.Component {
-  state = {
-    inputValue: '',
-    page: 1,
-    images: [],
-    loading: false,
-    currentPreview: '',
-    totalHits: 0,
+export default function App() {
+  const [inputValue, setInputValue] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [currentPreview, setCurrentPreview] = useState('');
+  const [totalHits, setTotalHits] = useState(0);
+
+  const handleFormSubmit = inputValue => setInputValue(inputValue);
+
+  const getInputValue = value => {
+    setInputValue(inputValue);
+    setImages([]);
+    setPage(1);
+    setTotalHits(0);
   };
 
-  quantityImg = 0;
-
-  handleFormSubmit = inputValue => {
-    this.setState({ inputValue });
-  };
-
-  getInputValue = value => {
-    this.setState({ inputValue: value, images: [], page: 1, totalHits: 0 });
-  };
-
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.inputValue !== this.state.inputValue) {
-      this.setState({ page: 1, images: [], loading: false });
-      this.getImages(this.state.inputValue);
-    }
-
-    if (
-      prevState.page !== this.state.page &&
-      prevState.inputValue === this.state.inputValue
-    ) {
-      this.getImages(this.state.inputValue);
-    }
-  }
-
-  getImages = key => {
-    this.setState({ loading: 'true' });
-    fetchImages(key, this.state.page)
-      .then(({ data: { hits, totalHits } }) => {
-        if (totalHits === 0) {
-          alert(`We dont find ${this.state.inputValue}`);
-        }
-        this.setState(prevState => {
-          return {
-            totalHits,
-            images: [...prevState.images, ...hits],
-          };
+  useEffect(() => {
+    if (inputValue) {
+      setLoading(true);
+      fetchImages(inputValue, page)
+        .then(({ data: { hits, totalHits } }) => {
+          if (totalHits === 0) {
+            alert(`We dont find ${inputValue}`);
+          }
+          setTotalHits(totalHits);
+          setImages(prevImages => {
+            return [...prevImages, ...hits];
+          });
+        })
+        .catch(error => console.log(error))
+        .finally(() => {
+          setLoading(false);
         });
-      })
-      .catch(error => console.log(error))
-      .finally(() => {
-        return this.setState({ loading: false });
-      });
+    }
+  }, [page, inputValue]);
+
+  const loadMore = () => {
+    setPage(page + 1);
   };
 
-  loadMore = () => {
-    this.setState(prevState => {
-      return {
-        page: prevState.page + 1,
-      };
-    });
+  const openModal = url => {
+    setCurrentPreview(url);
   };
 
-  openModal = url => {
-    this.setState({ currentPreview: url });
+  const closeModal = () => {
+    setCurrentPreview('');
   };
 
-  closeModal = () => {
-    this.setState({ currentPreview: '' });
-  };
+  return (
+    <div>
+      <SearchBar onSubmit={handleFormSubmit} resetValue={getInputValue} />
 
-  render() {
-    const { loading, images, currentPreview, totalHits } = this.state;
-    return (
-      <div>
-        <SearchBar
-          onSubmit={this.handleFormSubmit}
-          resetValue={this.getInputValue}
-        />
+      {loading && <Loader />}
 
-        {loading && <Loader />}
+      <ImageGallery images={images} openModal={openModal} />
+      {images.length < totalHits && <Button onClick={loadMore} />}
 
-        <ImageGallery images={images} openModal={this.openModal} />
-        {images.length < totalHits && <Button onClick={this.loadMore} />}
-
-        {currentPreview && (
-          <Modal closeModal={this.closeModal} showModal={currentPreview} />
-        )}
-      </div>
-    );
-  }
+      {currentPreview && (
+        <Modal closeModal={closeModal} showModal={currentPreview} />
+      )}
+    </div>
+  );
 }
